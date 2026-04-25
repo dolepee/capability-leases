@@ -7,6 +7,7 @@ const els = {
   ensName: document.querySelector("#ensName"),
   ensFacts: document.querySelector("#ensFacts"),
   addressFacts: document.querySelector("#addressFacts"),
+  addressTitle: document.querySelector("#addressTitle"),
   keeperTitle: document.querySelector("#keeperTitle"),
   keeperFacts: document.querySelector("#keeperFacts"),
   ensInput: document.querySelector("#ensInput"),
@@ -107,7 +108,7 @@ function render(state) {
   renderAddresses(state.addresses, state.demo);
   renderKeeper(state.keeper);
   renderCounterparty(state.lease, state.ensLookup);
-  renderTimeline(state.timeline);
+  renderTimeline(state.timeline, state.demo);
 }
 
 function renderPosture(lease) {
@@ -154,14 +155,18 @@ function renderEns(ens, resolver, lookup) {
 }
 
 function renderAddresses(addresses, demo) {
+  els.addressTitle.textContent =
+    demo.mode === "deployed" ? `${demo.chainName ?? "Live"} deployment` : demo.mode === "local" ? "Local deployment" : "Static demo";
   els.addressFacts.innerHTML = facts([
     ["mode", demo.mode],
+    ["chain", demo.chainName ?? "unknown"],
     ["chain id", demo.chainId],
     ["max spend", `${demo.maxSpendEth} ETH`],
     ["action value", `${demo.actionValueEth} ETH`],
     ["heartbeat", `${demo.heartbeatIntervalSeconds}s + ${demo.staleGraceSeconds}s grace`],
     ["expiry", `${demo.expiresInSeconds}s`],
     ["time travel", demo.timeTravelAvailable ? "available" : "live chain only"],
+    ["explorer", demo.explorerBaseUrl ? "configured" : "not configured"],
     ["controller", short(addresses.controller)],
     ["router", short(addresses.router)],
     ["owner", short(addresses.owner)],
@@ -189,7 +194,7 @@ function renderCounterparty(lease, lookup) {
   if (!lookup && !lease) {
     els.counterpartyTitle.textContent = "Waiting for named agent";
     els.counterpartyDecision.textContent =
-      "Resolve a real ENS name or create a local lease. The counterparty only delegates when the named agent resolves and its lease posture is green.";
+      "Resolve a real ENS name or create a lease. The counterparty only delegates when the named agent resolves and its lease posture is green.";
     return;
   }
   if (lookup && !lookup.configured) {
@@ -213,11 +218,11 @@ function renderCounterparty(lease, lookup) {
     els.counterpartyDecision.innerHTML = `<strong>${escapeHtml(name)}</strong> is ${escapeHtml(lease.posture)} / ${escapeHtml(lease.status)}. No new authority should be delegated.`;
     return;
   }
-  els.counterpartyTitle.textContent = "Resolved, no local lease";
-  els.counterpartyDecision.innerHTML = `<strong>${escapeHtml(name)}</strong> resolved, but no local lease is active in this demo session.`;
+  els.counterpartyTitle.textContent = "Resolved, no active lease";
+  els.counterpartyDecision.innerHTML = `<strong>${escapeHtml(name)}</strong> resolved, but no lease is active in this demo session.`;
 }
 
-function renderTimeline(events) {
+function renderTimeline(events, demo) {
   if (!events.length) {
     els.timeline.innerHTML = `<p class="muted">No receipts yet. Create a lease to start the loop.</p>`;
     return;
@@ -229,7 +234,7 @@ function renderTimeline(events) {
           <strong>${escapeHtml(event.step)}</strong>
           <span class="pill ${pillClass(event.posture)}">${escapeHtml(event.posture)}</span>
           <span>${escapeHtml(event.detail ?? "")}</span>
-          <span class="muted">${escapeHtml(event.tx ?? "")}</span>
+          ${txMarkup(event, demo)}
         </article>
       `,
     )
@@ -248,6 +253,8 @@ function createSimulatedState() {
     demo: {
       mode: "static-vercel-demo",
       chainId: 31337,
+      chainName: "Static demo",
+      explorerBaseUrl: "",
       maxSpendEth: "1",
       actionValueEth: "0.1",
       heartbeatIntervalSeconds: "120",
@@ -285,6 +292,17 @@ function createSimulatedState() {
     lease: null,
     timeline: [],
   };
+}
+
+function txMarkup(event, demo) {
+  const label = escapeHtml(event.tx ?? "");
+  if (!event.txHash || !demo?.explorerBaseUrl) return `<span class="muted">${label}</span>`;
+  const href = `${stripTrailingSlash(demo.explorerBaseUrl)}/tx/${encodeURIComponent(event.txHash)}`;
+  return `<a class="muted" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>`;
+}
+
+function stripTrailingSlash(value) {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
 function simulateMutation(url) {

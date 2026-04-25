@@ -2,7 +2,6 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import ganache from "ganache";
 import {
   createPublicClient,
   createWalletClient,
@@ -29,6 +28,8 @@ const port = Number(process.env.PORT ?? 4317);
 const host = process.env.HOST ?? "127.0.0.1";
 const demoMode = process.env.DEMO_MODE ?? "local";
 const isDeployedMode = demoMode === "deployed";
+const defaultExplorerBaseUrl = process.env.CHAIN_ID === "11155111" ? "https://sepolia.etherscan.io" : "";
+const explorerBaseUrl = stripTrailingSlash(process.env.EXPLORER_BASE_URL ?? defaultExplorerBaseUrl);
 
 const STATUS = ["ACTIVE", "DEGRADED", "FROZEN", "REVOKED", "EXPIRED"];
 const POSTURE = ["GREEN", "YELLOW", "RED"];
@@ -42,7 +43,7 @@ const controllerArtifact = readArtifact("LeaseController");
 const routerArtifact = readArtifact("MockActionRouter");
 const provider = isDeployedMode
   ? null
-  : ganache.provider({
+  : (await import("ganache")).default.provider({
       chain: { chainId: 31337 },
       wallet: { totalAccounts: 3, defaultBalance: 1000 },
       logging: { quiet: true },
@@ -384,6 +385,8 @@ async function statePayload() {
     demo: {
       mode: demoMode,
       chainId: chain.id,
+      chainName: chain.name,
+      explorerBaseUrl,
       maxSpendEth,
       actionValueEth,
       heartbeatIntervalSeconds: heartbeatIntervalSeconds.toString(),
@@ -596,4 +599,8 @@ function unixIso(seconds) {
 
 function shortHash(value) {
   return `${value.slice(0, 8)}...${value.slice(-6)}`;
+}
+
+function stripTrailingSlash(value) {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
