@@ -1,0 +1,8 @@
+node_modules/
+artifacts/
+dist/
+deployments/
+coverage/
+.env
+.env.local
+*.log

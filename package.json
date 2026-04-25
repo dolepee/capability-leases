@@ -1,0 +1,23 @@
+{
+  "name": "capability-leases",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Onchain capability leases for autonomous agents.",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/**/*.test.js",
+    "compile": "node scripts/compile.mjs",
+    "deploy": "npm run compile && node scripts/deploy.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "ens:check": "node scripts/ens-check.mjs",
+    "build:static": "node scripts/build-static.mjs",
+    "demo:local": "node scripts/local-demo.mjs",
+    "demo:web": "npm run compile && node scripts/demo-web.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.48.1"
+  },
+  "devDependencies": {
+    "ganache": "^7.9.2",
+    "solc": "^0.8.34"
+  }
+}

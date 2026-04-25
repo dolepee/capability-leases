@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Capability Leases</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">Autonomous agent authority</p>
+        <div class="hero-grid">
+          <div>
+            <h1>Power expires unless trust is continuously earned.</h1>
+            <p class="lede">
+              Capability Leases gives an agent scoped, heartbeat-bound authority. The controller permits valid actions,
+              refuses policy breaks, and freezes stale agents through a keeper loop.
+            </p>
+          </div>
+          <section class="posture-card" id="postureCard">
+            <span class="status-dot status-muted"></span>
+            <p class="eyebrow">Live trust posture</p>
+            <strong id="posture">NO LEASE</strong>
+            <span id="status">Create a lease to start.</span>
+          </section>
+        </div>
+      </header>
+
+      <section class="panel controls">
+        <button id="createLease">Create lease</button>
+        <button id="heartbeat">Heartbeat</button>
+        <button id="validAction">Valid action</button>
+        <button id="invalidAction">Invalid route</button>
+        <button id="advanceDegrade">Miss heartbeat</button>
+        <button id="advanceFreeze">Miss grace</button>
+        <button id="keeperScan">Keeper scan</button>
+      </section>
+
+      <section class="panel ens-lookup">
+        <div>
+          <p class="eyebrow">Functional ENS lookup</p>
+          <h2>Resolve a named agent</h2>
+        </div>
+        <input id="ensInput" placeholder="agent.yourname.eth" value="guarded-agent.eth" />
+        <button id="resolveEns">Resolve ENS</button>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="section-head">
+            <p class="eyebrow">Current lease</p>
+            <h2 id="leaseTitle">No active lease</h2>
+          </div>
+          <dl class="facts" id="leaseFacts"></dl>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <p class="eyebrow">ENS trust handle</p>
+            <h2 id="ensName">guarded-agent.eth</h2>
+          </div>
+          <dl class="facts" id="ensFacts"></dl>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <p class="eyebrow">Counterparty decision</p>
+          <h2 id="counterpartyTitle">Waiting for named agent</h2>
+        </div>
+        <p class="decision" id="counterpartyDecision">
+          Resolve a real ENS name or create a local lease. The counterparty only delegates when the named agent resolves and
+          its lease posture is green.
+        </p>
+      </section>
+
+      <section class="grid two">
+        <article class="panel">
+          <div class="section-head">
+            <p class="eyebrow">Addresses</p>
+            <h2>Local deployment</h2>
+          </div>
+          <dl class="facts" id="addressFacts"></dl>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <p class="eyebrow">Keeper</p>
+            <h2 id="keeperTitle">Scanning</h2>
+          </div>
+          <dl class="facts" id="keeperFacts"></dl>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <p class="eyebrow">Receipt timeline</p>
+          <h2>Executed, refused, degraded, frozen</h2>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
