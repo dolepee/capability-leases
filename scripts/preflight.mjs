@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import { loadLocalEnv } from "../lib/env-loader.mjs";
 import { KeeperHubAdapter } from "../lib/keeperhub-adapter.mjs";
 import { CapabilityEnsResolver } from "../lib/ens-resolver.mjs";
+
+loadLocalEnv();
 
 const rootDir = process.cwd();
 const checks = [];

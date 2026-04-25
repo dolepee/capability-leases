@@ -1,4 +1,7 @@
+import { loadLocalEnv } from "../lib/env-loader.mjs";
 import { CapabilityEnsResolver } from "../lib/ens-resolver.mjs";
+
+loadLocalEnv();
 
 const name = process.argv[2] ?? process.env.AGENT_ENS_NAME;
 if (!name) {

@@ -18,10 +18,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { CapabilityEnsResolver } from "../lib/ens-resolver.mjs";
+import { loadLocalEnv } from "../lib/env-loader.mjs";
 import { KeeperHubAdapter } from "../lib/keeperhub-adapter.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, "..");
+loadLocalEnv(rootDir);
 const webDir = path.join(rootDir, "web");
 const port = Number(process.env.PORT ?? 4317);
 const host = process.env.HOST ?? "127.0.0.1";
