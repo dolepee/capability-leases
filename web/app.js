@@ -27,7 +27,8 @@ const actions = {
   keeperScan: ["/api/keeper-scan", {}],
 };
 let apiAvailable = true;
-let simulatedState = createSimulatedState();
+let liveApiSeen = false;
+let lastLiveState = null;
 
 for (const [id, [url, body]] of Object.entries(actions)) {
   document.querySelector(`#${id}`).addEventListener("click", () => mutate(url, body));
@@ -44,10 +45,7 @@ setInterval(refresh, 2500);
 async function mutate(url, body) {
   setBusy(true);
   try {
-    if (!apiAvailable) {
-      render(simulateMutation(url, body));
-      return;
-    }
+    if (!apiAvailable) throw new Error("Live API unavailable. Start the server-backed demo; no mock transactions are shown.");
     const response = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -55,10 +53,11 @@ async function mutate(url, body) {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? "request failed");
+    rememberLiveState(payload);
     render(payload);
   } catch (error) {
     apiAvailable = false;
-    render(simulateMutation(url, body));
+    await renderLiveError(error);
   } finally {
     setBusy(false);
   }
@@ -66,16 +65,18 @@ async function mutate(url, body) {
 
 async function refresh() {
   if (!apiAvailable) {
-    render(simulatedState);
+    await renderLiveError(new Error("Live API unavailable. This page does not use mock data."));
     return;
   }
   try {
     const response = await fetch("/api/state");
     if (!response.ok) throw new Error("API unavailable");
-    render(await response.json());
-  } catch {
+    const payload = await response.json();
+    rememberLiveState(payload);
+    render(payload);
+  } catch (error) {
     apiAvailable = false;
-    render(simulatedState);
+    await renderLiveError(error);
   }
 }
 
@@ -83,22 +84,117 @@ async function resolveEns() {
   setBusy(true);
   try {
     const name = els.ensInput.value.trim();
-    if (!apiAvailable) {
-      simulatedState.ensLookup = simulatedEnsLookup(name);
-      render(simulatedState);
-      return;
-    }
+    if (!apiAvailable) throw new Error("Live API unavailable. ENS lookup requires the server API.");
     const response = await fetch(`/api/ens/resolve?name=${encodeURIComponent(name)}`);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? "ENS resolve failed");
+    rememberLiveState(payload);
     render(payload);
   } catch (error) {
     apiAvailable = false;
-    simulatedState.ensLookup = simulatedEnsLookup(els.ensInput.value.trim());
-    render(simulatedState);
+    await renderLiveError(error);
   } finally {
     setBusy(false);
   }
+}
+
+function rememberLiveState(state) {
+  if (state?.demo?.mode && state.demo.mode !== "api-unavailable") {
+    liveApiSeen = true;
+    lastLiveState = state;
+  }
+}
+
+async function renderLiveError(error) {
+  let state = lastLiveState;
+  try {
+    const response = await fetch("/api/state");
+    if (response.ok) {
+      state = await response.json();
+      rememberLiveState(state);
+    }
+  } catch {
+    // Keep the last live state. Never downgrade a live session into generated demo data.
+  }
+  if (!state) {
+    renderUnavailable(error);
+    return;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const event = {
+    step: "live API error",
+    status: state.lease?.status ?? "ERROR",
+    posture: state.lease?.posture ?? "RED",
+    provider: "live-api",
+    detail: message,
+    tx: "no tx",
+    txHash: null,
+    iso: new Date().toISOString(),
+  };
+  render({ ...state, timeline: [event, ...(state.timeline ?? [])] });
+}
+
+function renderUnavailable(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  render({
+    addresses: {
+      controller: "",
+      router: "",
+      owner: "",
+      agent: "",
+      keeper: "",
+    },
+    demo: {
+      mode: "api-unavailable",
+      chainId: "unknown",
+      chainName: "No live API",
+      explorerBaseUrl: "",
+      maxSpendEth: "unknown",
+      actionValueEth: "unknown",
+      heartbeatIntervalSeconds: "unknown",
+      staleGraceSeconds: "unknown",
+      expiresInSeconds: "unknown",
+      timeTravelAvailable: false,
+    },
+    ens: {
+      name: "requires-live-api",
+      namehash: "",
+      records: {
+        "capabilityLeases.registry": "",
+        "capabilityLeases.leaseId": "",
+        "capabilityLeases.policyHash": "",
+        "capabilityLeases.guardian": "",
+      },
+    },
+    keeper: {
+      running: false,
+      scanning: false,
+      provider: "not connected",
+      keeperHub: {
+        mode: "not connected",
+        network: "unknown",
+        walletConfigured: false,
+        apiKeyConfigured: false,
+      },
+      lastScanIso: null,
+      watchedLeaseIds: [],
+    },
+    ensResolver: { configured: false },
+    ensLookup: null,
+    lease: null,
+    timeline: [
+      {
+        step: "live API unavailable",
+        status: "ERROR",
+        posture: "RED",
+        provider: "frontend",
+        detail: message,
+        tx: "no mock data",
+        txHash: null,
+        iso: new Date().toISOString(),
+      },
+    ],
+  });
 }
 
 function render(state) {
@@ -156,7 +252,11 @@ function renderEns(ens, resolver, lookup) {
 
 function renderAddresses(addresses, demo) {
   els.addressTitle.textContent =
-    demo.mode === "deployed" ? `${demo.chainName ?? "Live"} deployment` : demo.mode === "local" ? "Local deployment" : "Static demo";
+    demo.mode === "deployed"
+      ? `${demo.chainName ?? "Live"} deployment`
+      : demo.mode === "local"
+        ? "Local deployment"
+        : "Live API unavailable";
   els.addressFacts.innerHTML = facts([
     ["mode", demo.mode],
     ["chain", demo.chainName ?? "unknown"],
@@ -241,59 +341,6 @@ function renderTimeline(events, demo) {
     .join("");
 }
 
-function createSimulatedState() {
-  return {
-    addresses: {
-      controller: "0x442781f981457813da9198871055ae91dfcb5a1d",
-      router: "0xb23be6d0dff5ebbe7e15b1f48ab821b6ce0d2f39",
-      owner: "0x3840022b7c29afc7e2ed204b4c30a60a85f6b87c",
-      agent: "0x42475eac4d3b2ed0f8b5ff391824bf961aa51303",
-      keeper: "0x9cb5c9214c0bfa1cf3b005019715987372262a94",
-    },
-    demo: {
-      mode: "static-vercel-demo",
-      chainId: 31337,
-      chainName: "Static demo",
-      explorerBaseUrl: "",
-      maxSpendEth: "1",
-      actionValueEth: "0.1",
-      heartbeatIntervalSeconds: "120",
-      staleGraceSeconds: "60",
-      expiresInSeconds: "900",
-      timeTravelAvailable: true,
-    },
-    ens: {
-      name: "guarded-agent.eth",
-      namehash: "0x7f1e364c1e85796dfde9454c3c272f86eb19c2aa92b26fa80a322ff6334ad03b",
-      records: {
-        "capabilityLeases.registry": "0x442781f981457813da9198871055ae91dfcb5a1d",
-        "capabilityLeases.leaseId": "",
-        "capabilityLeases.policyHash": "0x3e6a293fe369039cf7dfaa5ee57cc8f695520097905f423acd1295bd88b15434",
-        "capabilityLeases.guardian": "0x9cb5c9214c0bfa1cf3b005019715987372262a94",
-      },
-    },
-    keeper: {
-      running: true,
-      scanning: false,
-      provider: "browser-simulated-keeper",
-      keeperHub: {
-        mode: "static-demo",
-        network: "sepolia",
-        walletConfigured: false,
-        apiKeyConfigured: false,
-      },
-      lastScanIso: null,
-      watchedLeaseIds: [],
-    },
-    ensResolver: {
-      configured: false,
-    },
-    ensLookup: null,
-    lease: null,
-    timeline: [],
-  };
-}
-
 function txMarkup(event, demo) {
   const label = escapeHtml(event.tx ?? "");
   if (!event.txHash || !demo?.explorerBaseUrl) return `<span class="muted">${label}</span>`;
@@ -303,124 +350,6 @@ function txMarkup(event, demo) {
 
 function stripTrailingSlash(value) {
   return value.endsWith("/") ? value.slice(0, -1) : value;
-}
-
-function simulateMutation(url) {
-  const nowIso = new Date().toISOString();
-  if (url === "/api/create-lease") {
-    simulatedState = createSimulatedState();
-    simulatedState.ens.records["capabilityLeases.leaseId"] = "1";
-    simulatedState.keeper.watchedLeaseIds = ["1"];
-    simulatedState.lease = createSimulatedLease("ACTIVE", "GREEN", "0", "1");
-    simulatedState.timeline.unshift(simEvent("created", "GREEN", "wallet-direct", "1 ETH max spend, executeRoute(USDC-WETH) only", "0xd0a5f8...0d02cf"));
-    return simulatedState;
-  }
-  if (!simulatedState.lease) {
-    simulatedState.lease = createSimulatedLease("ACTIVE", "GREEN", "0", "1");
-    simulatedState.keeper.watchedLeaseIds = ["1"];
-  }
-  if (url === "/api/heartbeat") {
-    simulatedState.lease.status = "ACTIVE";
-    simulatedState.lease.posture = "GREEN";
-    simulatedState.lease.lastHeartbeatIso = nowIso;
-    simulatedState.timeline.unshift(simEvent("heartbeat", "GREEN", "wallet-direct", "agent proved liveness", "0x267772...fed0a4"));
-  }
-  if (url === "/api/execute-valid") {
-    if (simulatedState.lease.status === "ACTIVE") {
-      simulatedState.lease.spentEth = "0.1";
-      simulatedState.lease.unspentEth = "0.9";
-      simulatedState.timeline.unshift(
-        simEvent("valid action", "GREEN", "wallet-direct", "allowed route executed and spend accounted", "0xba8bde...a4de13"),
-      );
-    } else {
-      simulatedState.timeline.unshift(
-        simEvent("valid action", simulatedState.lease.posture, "wallet-direct", `refused: LEASE_${simulatedState.lease.status}`, "0x0c0ed8...16c450"),
-      );
-    }
-  }
-  if (url === "/api/execute-invalid") {
-    simulatedState.timeline.unshift(
-      simEvent("invalid route", simulatedState.lease.posture, "wallet-direct", "refused: CALLDATA_NOT_ALLOWED", "0xee80d9...1ecf15"),
-    );
-  }
-  if (url === "/api/advance-to-degrade") {
-    simulatedState.lease.status = "DEGRADED";
-    simulatedState.lease.posture = "YELLOW";
-    simulatedState.timeline.unshift(simEvent("miss heartbeat", "YELLOW", "local-time", "advanced to cross heartbeat deadline", "local-time"));
-    simulatedState.timeline.unshift(
-      simEvent("keeper degraded", "YELLOW", "browser-simulated-keeper", "KeeperHub scan found late heartbeat via browser-simulated-keeper", "0x1b42aa...380e8a"),
-    );
-  }
-  if (url === "/api/advance-to-freeze") {
-    simulatedState.lease.status = "FROZEN";
-    simulatedState.lease.posture = "RED";
-    simulatedState.timeline.unshift(simEvent("miss grace", "RED", "local-time", "advanced to cross freeze deadline", "local-time"));
-    simulatedState.timeline.unshift(
-      simEvent("deadman freeze", "RED", "browser-simulated-keeper", "KeeperHub scan found missed heartbeat beyond grace via browser-simulated-keeper", "0x5e0d7a...678634"),
-    );
-  }
-  if (url === "/api/keeper-scan") {
-    simulatedState.keeper.lastScanIso = nowIso;
-  }
-  return simulatedState;
-}
-
-function createSimulatedLease(status, posture, spentEth, unspentEth) {
-  return {
-    leaseId: "1",
-    owner: simulatedState.addresses.owner,
-    agent: simulatedState.addresses.agent,
-    spendToken: "0x0000000000000000000000000000000000000000",
-    maxSpendEth: "1",
-    spentEth,
-    unspentEth,
-    allowedTarget: simulatedState.addresses.router,
-    allowedSelector: "0x4b9245c1",
-    allowedCalldataHash: "0x9033d86b4f5d09024f300f0a7858c37127a6922ab2b199190c0c0853cd126c1e",
-    heartbeatIntervalSeconds: "120",
-    staleGracePeriodSeconds: "60",
-    lastHeartbeatIso: new Date().toISOString(),
-    expiresAtIso: new Date(Date.now() + 900_000).toISOString(),
-    policyHash: simulatedState.ens.records["capabilityLeases.policyHash"],
-    ensNamehash: simulatedState.ens.namehash,
-    status,
-    posture,
-  };
-}
-
-function simulatedEnsLookup(name) {
-  return {
-    name: name || "guarded-agent.eth",
-    namehash: simulatedState.ens.namehash,
-    configured: false,
-    address: null,
-    textRecords: {
-      "capabilityLeases.registry": null,
-      "capabilityLeases.leaseId": null,
-      "capabilityLeases.policyHash": null,
-      "capabilityLeases.trustUrl": null,
-      "capabilityLeases.guardian": null,
-    },
-    missingTextKeys: [
-      "capabilityLeases.registry",
-      "capabilityLeases.leaseId",
-      "capabilityLeases.policyHash",
-      "capabilityLeases.trustUrl",
-      "capabilityLeases.guardian",
-    ],
-  };
-}
-
-function simEvent(step, posture, provider, detail, tx) {
-  return {
-    step,
-    status: posture === "GREEN" ? "ACTIVE" : posture === "YELLOW" ? "DEGRADED" : "FROZEN",
-    posture,
-    provider,
-    detail,
-    tx,
-    iso: new Date().toISOString(),
-  };
 }
 
 function facts(rows) {
