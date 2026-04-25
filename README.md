@@ -14,6 +14,16 @@ Capability Leases lets an owner grant an agent narrow, expiring authority:
 
 The thesis is simple: an agent's power should expire unless trust is continuously earned.
 
+## Live Testnet Deployment
+
+Ethereum Sepolia:
+
+- `LeaseController`: `0x499f2e55ff9e3354d09829783d77c2d735acb622`
+- `MockActionRouter`: `0x7eaaa9d1cec29bb2e61e0fd291c268f8bcd9d6e4`
+- deployment artifact: `deployments/11155111.json`
+- explorer: `https://sepolia.etherscan.io`
+- web demo: `https://capability-leases.vercel.app`
+
 ## Current Scope
 
 This repo starts with the contract primitive and regression tests:

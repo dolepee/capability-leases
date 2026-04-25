@@ -34,11 +34,14 @@ checks.push({
   detail: ensStatus.configured ? "ENS RPC configured" : "missing ETHEREUM_RPC_URL or ENS_RPC_URL",
 });
 
+const expectedDeployment = `deployments/${process.env.CHAIN_ID ?? "11155111"}.json`;
 const deploymentFiles = listDeploymentFiles();
 checks.push({
   name: "Deployment artifact",
-  ok: deploymentFiles.length > 0,
-  detail: deploymentFiles.length ? deploymentFiles.join(", ") : "run npm run deploy after setting RPC_URL and PRIVATE_KEY",
+  ok: deploymentFiles.includes(expectedDeployment),
+  detail: deploymentFiles.includes(expectedDeployment)
+    ? expectedDeployment
+    : `missing ${expectedDeployment}; run npm run deploy after setting RPC_URL and PRIVATE_KEY`,
 });
 
 const agentEnsName = process.env.AGENT_ENS_NAME;

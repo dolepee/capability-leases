@@ -1,0 +1,18 @@
+{
+  "chainId": 11155111,
+  "chainName": "Sepolia",
+  "deployedAt": "2026-04-25T12:05:14.777Z",
+  "deployer": "0x8942F989343e4Ce8e4c8c0D7C648a6953ff3A5A2",
+  "contracts": {
+    "LeaseController": {
+      "address": "0x499f2e55ff9e3354d09829783d77c2d735acb622",
+      "txHash": "0xbd62e3a99bfb0e2b6d68562dbebac7b52f8e425e49dc09dba5c7add4f6283716",
+      "blockNumber": "10729380"
+    },
+    "MockActionRouter": {
+      "address": "0x7eaaa9d1cec29bb2e61e0fd291c268f8bcd9d6e4",
+      "txHash": "0x472c8c7ae923da37d3517d7eb562d1484806802de15b65889a50c601a997e84b",
+      "blockNumber": "10729381"
+    }
+  }
+}
